@@ -1,42 +1,124 @@
 ﻿@page "/"
+@rendermode InteractiveServer
 
 <PageTitle>Pizza Order</PageTitle>
 
 <h1 class="display-4 text-center p-5">Pizza Order</h1>
 
-<form class="form bg-light border border-1 p-5">
+<EditForm Model="Order" FormName="OrderForm" OnValidSubmit="CustomValidation"
+  class="form bg-light border border-1 p-5" Enhance>
+  <DataAnnotationsValidator />
+  <CustomValidation @ref="customValidation" />
+  <ValidationSummary />
   @if (success)
   {
   <div class="alert alert-success">@successMessage</div>
   }
   <div class="form-group mb-3">
     <label class="form-label" for="size">Size</label>
-    <select class="form-select" id="size">
+    <InputSelect @bind-Value="Order.Size" class="form-control" id="size">
       <option value="">Select a size</option>
       @foreach (var size in sizes)
       {
         <option value="@size">@size</option>
       }
-    </select>
+    </InputSelect>
   </div>
 
   <div class="form-group mb-3">
     <p>Choose up to 3 toppings</p>
-    @foreach (var topping in toppings)
+    @foreach (var topping in Order.Toppings)
     {
       <div class="form-check">
-        <input type="checkbox" class="form-check-input" />
-        <label class="form-check-label">@topping</label>
+        <InputCheckbox class="form-check-input" id="@topping.Value" @bind-Value="topping.IsChecked" />
+        <label for="@topping.Value">@topping.Text</label>
       </div>
     }
   </div>
 
   <button class="btn btn-primary">Order Pizza</button>
-</form>
+</EditForm>
 
 @code {
   private static List<string> sizes = ["Small", "Medium", "Large"];
   private static List<string> toppings = ["Pepperoni", "Sausage", "Ham", "Mushrooms", "Onions", "Peppers"];
   private bool success = false;
   private string successMessage = "";
+
+  private class PizzaModel
+  {
+    public List<CheckboxItem> Toppings { get; set; } = new();
+    [Required]
+    public string Size { get; set; } = "";
+  }
+
+
+  [SupplyParameterFromForm]
+  private PizzaModel Order { get; set; } = new();
+
+  private CustomValidation? customValidation;
+
+  protected override void OnInitialized() 
+  {
+    foreach (var topping in toppings)
+    {
+      Order.Toppings.Add(new CheckboxItem{Text = topping, Value = topping});
+    }
+  }
+
+  private void CustomValidation () 
+  {
+    customValidation?.ClearErrors();
+    var errors = new Dictionary<string, List<string>>();
+    
+    List<string> selectedToppings = [];
+    foreach (var topping in Order.Toppings) {
+      if (topping.IsChecked) {
+        selectedToppings.Add(topping.Value);
+      }
+    }
+
+    int TotalToppings = selectedToppings.Count;
+
+    switch (Order.Size)
+    {
+      case "Small":
+        if (TotalToppings > 2) {
+          errors.Add(nameof(Order.Toppings), new () {"Small pizza may not have more than 2 toppings."});
+        }
+        break;
+      case "Medium":
+        if (TotalToppings > 3) {
+          errors.Add(nameof(Order.Toppings), new () {"Medium pizza may not have more than 3 toppings."});
+        }
+        break;
+      case "Large":
+        if (TotalToppings > 5) {
+          errors.Add(nameof(Order.Toppings), new () {"Large pizza may not have more than 5 toppings."});
+        }
+        break;
+    }
+
+    if (errors.Any())
+    {
+        customValidation?.DisplayErrors(errors);
+    }
+    else
+    {
+      OrderPizza();
+    }
+  }
+
+  private void OrderPizza()
+  {
+    List<string> selectedToppings = [];
+    foreach (var topping in Order.Toppings) {
+      if (topping.IsChecked) {
+        selectedToppings.Add(topping.Value);
+      }
+    }
+    
+    successMessage = $"You {Order.Size} pizza with {string.Join(", ", selectedToppings)} is on it's way.";
+    success = true;
+  }
 }
